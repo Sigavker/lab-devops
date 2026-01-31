@@ -1,16 +1,66 @@
-# Terraform local state & locks
-.terraform/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-*.tfvars
+name: CI/CD Pipeline to EKS
 
-# Secrets (Just in case)
-*.pem
-*.key
-.env
+on:
+  push:
+    branches: [ "main" ] # הפייפליין ירוץ רק כשדוחפים ל-Main
 
-# OS / IDE
-.DS_Store
-.vscode/
-.idea/
+env:
+  ECR_REPOSITORY: lab-devops-app
+  EKS_CLUSTER_NAME: lab-cluster
+  AWS_REGION: us-east-1
+  DEPLOYMENT_NAME: devops-app-deploy
+  CONTAINER_NAME: devops-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. משיכת הקוד מה-Repo
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. התחברות ל-AWS
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    # 3. התחברות ל-ECR (כדי שנוכל לדחוף לשם)
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # 4. בנייה ודחיפה של ה-Image (עם תגית ייחודית של ה-Commit SHA)
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # בניית האימג'
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./app
+        
+        # דחיפה ל-ECR
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        # שמירת שם האימג' המלא לשימוש בשלב הבא
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    # 5. עדכון ה-Kubeconfig (כדי ש-kubectl יידע לדבר עם הקלאסטר)
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
+    # 6. פריסה ל-EKS
+    # הטריק כאן: אנחנו מחליפים את ה-Image ב-Deployment הקיים לחדש שיצרנו כרגע
+    - name: Deploy to EKS
+      env:
+        NEW_IMAGE: ${{ steps.build-image.outputs.image }}
+      run: |
+        # עדכון האימג' בקלאסטר (Rolling Update)
+        kubectl set image deployment/$DEPLOYMENT_NAME $CONTAINER_NAME=$NEW_IMAGE
+        
+        # המתנה שהפריסה תסתיים בהצלחה
+        kubectl rollout status deployment/$DEPLOYMENT_NAME
