@@ -2,7 +2,10 @@ name: CI/CD Pipeline to EKS
 
 on:
   push:
-    branches: [ "main" ] # הפייפליין ירוץ רק כשדוחפים ל-Main
+    branches: [ "main" ]
+    paths:
+      - 'app/**'              # תריץ את הפייפליין רק אם יש שינוי בקוד האפליקציה
+      - '.github/workflows/**' # או בפייפליין עצמו
 
 env:
   ECR_REPOSITORY: lab-devops-app
