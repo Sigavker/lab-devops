@@ -5,7 +5,7 @@ metadata:
   labels:
     app: devops-app
 spec:
-  replicas: 2  # נריץ 2 עותקים כדי לראות איזון עומסים
+  replicas: 3  # נריץ 3 עותקים כדי לראות איזון עומסים
   selector:
     matchLabels:
       app: devops-app

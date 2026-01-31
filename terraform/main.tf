@@ -86,10 +86,13 @@ module "eks" {
 # יצירת Repository לאפליקציה שלנו
 resource "aws_ecr_repository" "app_repo" {
   name                 = "lab-devops-app"
-  image_tag_mutability = "MUTABLE" # מאפשר לדרוס תגיות (נוח לפיתוח)
+  image_tag_mutability = "MUTABLE"
+
+  # השורה החדשה שפותרת את הבעיה:
+  force_delete = true 
 
   image_scanning_configuration {
-    scan_on_push = true # סריקת אבטחה אוטומטית לכל Image שעולה
+    scan_on_push = true
   }
 
   tags = {
