@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-app-deploy
+  labels:
+    app: devops-app
+spec:
+  replicas: 2  # נריץ 2 עותקים כדי לראות איזון עומסים
+  selector:
+    matchLabels:
+      app: devops-app
+  template:
+    metadata:
+      labels:
+        app: devops-app
+    spec:
+      containers:
+      - name: devops-app
+        # הכתובת של ה-Image שלך ב-ECR
+        image: 630287362691.dkr.ecr.us-east-1.amazonaws.com/lab-devops-app:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-app-service
+spec:
+  type: LoadBalancer # זה יבקש מ-AWS להרים Load Balancer אמיתי
+  selector:
+    app: devops-app
+  ports:
+    - protocol: TCP
+      port: 80      # הפורט שפתוח לעולם
+      targetPort: 5000 # הפורט באפליקציה (Flask)
